@@ -37,7 +37,161 @@ p = (Profile('elite-example')
 p.run()
 ```
 
+### Loading from serialized JSON
 
+If saved to a profile JSON file, the above example produces substantially the following JSON:
+
+```json
+{
+    "configuration": {
+        "profile_name": "elite-example",
+        "schema_version": "0",
+        "triggers": [
+            {
+                "trigger_type": "voice_commander.triggers.VoiceTrigger",
+                "actions": [
+                    {
+                        "action_type": "voice_commander_elite.actions.SupercruiseAction",
+                        "action_config": {}
+                    }
+                ],
+                "conditions": [
+                    {
+                        "condition_type": "voice_commander_elite.conditions.EliteDangerousIsActive",
+                        "condition_config": {}
+                    }
+                ],
+                "trigger_config": {
+                    "*trigger_phrases": [
+                        "supercruise"
+                    ]
+                }
+            },
+            {
+                "trigger_type": "voice_commander.triggers.VoiceTrigger",
+                "actions": [
+                    {
+                        "action_type": "voice_commander_elite.actions.LandingGearToggleAction",
+                        "action_config": {}
+                    }
+                ],
+                "conditions": [
+                    {
+                        "condition_type": "voice_commander_elite.conditions.EliteDangerousIsActive",
+                        "condition_config": {}
+                    }
+                ],
+                "trigger_config": {
+                    "*trigger_phrases": [
+                        "retract landing gear",
+                        "lower landing gear"
+                    ]
+                }
+            }
+        ]
+    }
+}
+```
+
+To load and use this profile later in Python code, you can do the following:
+
+```python
+from voice_commander.profile import load_profile
+# import the extension package before loading the profile!
+# THIS IS IMPORTANT!
+# The import triggers the reading of your keybind file and ensures that all actions/conditions are properly initialized.
+import voice_commander_elite  # noqa
+
+profile = load_profile('./elite-example.vcp.json')
+profile.run()
+```
+
+### Serialization notes
+
+When serialized to JSON, by default, the `action_type` will refer to the fully qualified names within this extension package. 
+This _may_ cause the produced JSON to be incompatible with certain vanilla `voice-commander` features (since the specification for extensions is not yet defined).
+Specifically: invoking profiles from the command line, since there's no mechanism built into `voice-commander` to ensure the extension module is imported, the `action_type` will not resolve 
+properly. Though there are hacks to _make_ this work, until there is a formal extensions feature, we offer a better solution for this use case.
+Because the actions and conditions in this package are just subclasses of regular `voice-commander` actions, you can choose to serialize using those standard `action_type`s as well 
+by using the `.with_simplified_serialization` alternate constructor (or the `.wss` alias). This means that your profile will contain static bindings, so it won't be portable, but it 
+will be compatible with vanilla `voice-commander` without the need to install or specify any extension (once generated, obviously).
+
+TL;DR if you want to use the `voice-commander` CLI with profiles generated using `voice-commander-elite` actions, do the following:
+
+```diff
+-    .add_action(LandingGearToggleAction())
++    .add_action(LandingGearToggleAction.with_simplified_serialization()) # or .wss()
+```
+
+Again, remember that the generated profile will have static bindings and will not necessarily be portable or continue to work if you change your keybinds (you'll have to manually update your profile json).
+
+If you apply this change to use `.wss()` to invoke all the actions/conditions, the following JSON file will be produced:
+
+```json
+{
+    "configuration": {
+        "profile_name": "elite-example",
+        "schema_version": "0",
+        "triggers": [
+            {
+                "trigger_type": "voice_commander.triggers.VoiceTrigger",
+                "actions": [
+                    {
+                        "action_type": "voice_commander.actions.AHKPressAction",
+                        "conditions": [],
+                        "action_config": {
+                            "key": "s"
+                        }
+                    }
+                ],
+                "conditions": [
+                    {
+                        "condition_type": "voice_commander.conditions.AHKWindowIsActive",
+                        "condition_config": {
+                            "title": "Elite - Dangerous (CLIENT)"
+                        }
+                    }
+                ],
+                "trigger_config": {
+                    "*trigger_phrases": [
+                        "supercruise"
+                    ]
+                }
+            },
+            {
+                "trigger_type": "voice_commander.triggers.VoiceTrigger",
+                "actions": [
+                    {
+                        "action_type": "voice_commander.actions.AHKPressAction",
+                        "conditions": [],
+                        "action_config": {
+                            "key": "l"
+                        }
+                    }
+                ],
+                "conditions": [
+                    {
+                        "condition_type": "voice_commander.conditions.AHKWindowIsActive",
+                        "condition_config": {
+                            "title": "Elite - Dangerous (CLIENT)"
+                        }
+                    }
+                ],
+                "trigger_config": {
+                    "*trigger_phrases": [
+                        "retract landing gear",
+                        "lower landing gear"
+                    ]
+                }
+            }
+        ]
+    }
+}
+```
+
+As you can notice the resulting JSON has **no references to the extension package!** - it also has static keybindings present in the JSON (which were previously pulled from my personal elite dangerous bindings).
+
+Hopefully, this will not be necessary in the not-too-far future and eventually this constructor will be obsoleted.
 
 ## List of known possible actions
 

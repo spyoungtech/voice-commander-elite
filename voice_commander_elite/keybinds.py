@@ -4,7 +4,7 @@ import enum
 import os.path
 import warnings
 from pathlib import Path
-from typing import Literal, TypeAlias, Type
+from typing import Literal, TypeAlias, Type, Any, Self
 from bs4 import BeautifulSoup, Tag
 from voice_commander.actions import AHKPressAction
 import re
@@ -204,6 +204,8 @@ def binding_to_press_action(binding: Binding) -> Type[AHKPressAction]:
     assert ahk_key is not None
     class InitMixin:
         def __init__(self, *, key=None, **kwargs):
+            simplified_serialization = kwargs.pop('_simplified_serialization', False)
+            self._simplified_serialization = simplified_serialization
             if key is not None:
                 warnings.warn('parameter key was provided, but will be ignored', UserWarning, stacklevel=2)
 
@@ -211,6 +213,21 @@ def binding_to_press_action(binding: Binding) -> Type[AHKPressAction]:
         @classmethod
         def fqn(cls) -> str:
             return f'voice_commander_elite.actions.{binding.name}Action'
+
+        def to_dict(self) -> dict[str, Any]:
+            d = super().to_dict()
+            if self._simplified_serialization:
+                d['action_type'] = AHKPressAction.fqn()
+            else:
+                d['action_config'] = {}
+            return d
+
+        @classmethod
+        def with_simplified_serialization(cls, *args, **kwargs) -> Self:
+            return cls(*args, _simplified_serialization=True, **kwargs)
+
+        wss = with_simplified_serialization
+
     klass = type(f'{binding.name}Action', (InitMixin, AHKPressAction), {})
     return klass
 
